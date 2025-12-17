@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="RS-16">
   <xacro:property name="M_PI" value="3.1415926535897931" />
-  <xacro:macro name="RS-16" params="*origin parent:=base_link name:=robosense topic:=/robosense_points hz:=20 lasers:=16 samples:=900 collision_range:=0.4 min_range:=0.4 max_range:=150.0 noise:=0.008 min_angle:=-${M_PI} max_angle:=${M_PI} gpu:=false">
+  <xacro:macro name="RS-16" params="*origin parent:=base_link name:=robosense topic:=/robosense/points hz:=10 lasers:=16 samples:=900 collision_range:=0.4 min_range:=0.4 max_range:=150.0 noise:=0.008 min_angle:=-${M_PI} max_angle:=${M_PI} gpu:=false">
 
     <joint name="${name}_base_mount_joint" type="fixed">
-      <xacro:insert_block name="origin" /> 
+      <xacro:insert_block name="origin" />
       <parent link="${parent}"/>
       <child link="${name}_base_link"/>
     </joint>
@@ -13,9 +13,7 @@
       <inertial>
         <mass value="0.87"/>
         <origin xyz="0 0 0"/>
-        <inertia ixx="0.001094695" ixy="0" ixz="0"
-          iyy="0.001094695" iyz="0"
-          izz="0.001245079"/>
+        <inertia ixx="0.001094695" ixy="0" ixz="0" iyy="0.001094695" iyz="0" izz="0.001245079"/>
       </inertial>
       <visual>
         <origin rpy="-1.5707 0 0" xyz="0 0 0"/>
@@ -31,7 +29,7 @@
       </collision>
     </link>
 
-    <joint name="${name}_base_scan_joint" type="fixed" >
+    <joint name="${name}_base_scan_joint" type="fixed">
       <origin xyz="0 0 0.039" rpy="0 0 0" />
       <parent link="${name}_base_link" />
       <child link="${name}"/>
@@ -88,7 +86,7 @@
         </sensor>
       </xacro:if>
       <xacro:unless value="${gpu}">
-        <sensor type="ray" name="${name}-RS16">
+        <sensor type="ray" name="\${name}-RS16">
           <pose>0 0 0 0 0 0</pose>
           <visualize>false</visualize>
           <update_rate>${hz}</update_rate>
@@ -127,6 +125,59 @@
           </plugin>
         </sensor>
       </xacro:unless>
+    </gazebo>
+
+    <!--imu -->
+    <xacro:property name="imu_name" value="${name}_imu"/>
+    <xacro:property name="imu_topic" value="/${name}/imu"/>
+    <xacro:property name="imu_hz" value="100"/>
+
+    <joint name="${imu_name}_joint" type="fixed">
+      <parent link="${name}"/>
+      <child link="${imu_name}"/>
+      <origin xyz="0.0 0.0 0.0" rpy="0 0 0" />
+      <!-- <axis xyz="0 0 1" /> -->
+    </joint>
+
+    <link name="${imu_name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry >
+          <box size="0.01 0.01 0.01" />
+        </geometry>
+      </visual>
+
+      <inertial>
+        <mass value="0.01"/>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <inertia ixx="0.000001" ixy="0" ixz="0" iyy="0.000001" iyz="0.0" izz="0.000001"/>
+      </inertial>
+    </link>
+
+
+
+    <gazebo reference="${imu_name}">
+      <material>Gazebo/Green</material>
+    </gazebo>
+
+    <gazebo reference="${imu_name}">
+      <gravity>true</gravity>
+      <sensor name="${imu_name}" type="imu">
+        <always_on>true</always_on>
+        <update_rate>${imu_hz}</update_rate>
+        <visualize>true</visualize>
+        <topic>${imu_topic}</topic>
+        <plugin filename="libgazebo_ros_imu_sensor.so" name="imu_plugin">
+          <topicName>${imu_topic}</topicName>
+          <bodyName>${imu_name}</bodyName>
+          <updateRateHZ>${imu_hz}</updateRateHZ>
+          <gaussianNoise>0.0</gaussianNoise>
+          <xyzOffset>0 0 0</xyzOffset>
+          <rpyOffset>0 0 0</rpyOffset>
+          <frameName>${imu_name}</frameName>
+        </plugin>
+        <pose>0 0 0 0 0 0</pose>
+      </sensor>
     </gazebo>
 
   </xacro:macro>
