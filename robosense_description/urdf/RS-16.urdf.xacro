@@ -130,7 +130,7 @@
     <!--imu -->
     <xacro:property name="imu_name" value="${name}_imu"/>
     <xacro:property name="imu_topic" value="/${name}/imu"/>
-    <xacro:property name="imu_hz" value="100"/>
+    <xacro:property name="imu_hz" value="200"/>
 
     <joint name="${imu_name}_joint" type="fixed">
       <parent link="${name}"/>

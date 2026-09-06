@@ -266,12 +266,30 @@ void GazeboRosRobosenseLaser::OnScan(ConstLaserScanStampedPtr& _msg)
   const double MAX_RANGE = std::min(max_range_, maxRange);
   const double MIN_INTENSITY = min_intensity_;
 
+  // Per-point receive time: the sensor snapshots a full scan per update, but
+  // consumers (LIO front-ends) expect a rotating scanner's per-point timing.
+  // Approximate it by mapping each ray's azimuth linearly onto the scan
+  // period ending at the message stamp. Absolute sim time, nanoseconds as
+  // float64 (RoboSense driver convention).
+#if GAZEBO_MAJOR_VERSION >= 7
+  const double update_rate = parent_ray_sensor_->UpdateRate();
+#else
+  const double update_rate = parent_ray_sensor_->GetUpdateRate();
+#endif
+  const double scan_period_s = update_rate > 0.0 ? 1.0 / update_rate : 0.1;
+  const double frame_end_ns =
+      static_cast<double>(_msg->time().sec()) * 1e9 +
+      static_cast<double>(_msg->time().nsec());
+  const double frame_start_ns = frame_end_ns - scan_period_s * 1e9;
+  const double azimuth_span =
+      yDiff > 0.0 ? (maxAngle.Radian() - minAngle.Radian()) : 1.0;
+
   // Populate message fields
   const uint32_t POINT_STEP = 32;
   sensor_msgs::PointCloud2 msg;
   msg.header.frame_id = frame_name_;
   msg.header.stamp = ros::Time(_msg->time().sec(), _msg->time().nsec());
-  msg.fields.resize(5);
+  msg.fields.resize(6);
   msg.fields[0].name = "x";
   msg.fields[0].offset = 0;
   msg.fields[0].datatype = sensor_msgs::PointField::FLOAT32;
@@ -292,6 +310,10 @@ void GazeboRosRobosenseLaser::OnScan(ConstLaserScanStampedPtr& _msg)
   msg.fields[4].offset = 20;
   msg.fields[4].datatype = sensor_msgs::PointField::UINT16;
   msg.fields[4].count = 1;
+  msg.fields[5].name = "timestamp";
+  msg.fields[5].offset = 24;
+  msg.fields[5].datatype = sensor_msgs::PointField::FLOAT64;
+  msg.fields[5].count = 1;
   msg.data.resize(verticalRangeCount * rangeCount * POINT_STEP);
 
   int i, j;
@@ -345,6 +367,12 @@ void GazeboRosRobosenseLaser::OnScan(ConstLaserScanStampedPtr& _msg)
 #else
         *((uint16_t*)(ptr + 20)) = verticalRangeCount - 1 - j; // ring
 #endif
+        // receive time by azimuth fraction within the scan period
+        const double azimuth_frac = azimuth_span > 0.0
+            ? (yAngle - minAngle.Radian()) / (maxAngle.Radian() - minAngle.Radian())
+            : 0.0;
+        *((double*)(ptr + 24)) =
+            frame_start_ns + azimuth_frac * scan_period_s * 1e9;
         ptr += POINT_STEP;
       }
     }
